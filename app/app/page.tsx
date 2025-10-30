@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import CornerFrame from "@/app/components/CornerFrame";
 
 type Customer = {
   id: string;
@@ -104,7 +105,8 @@ export default function AppHome() {
   return (
     <div className="min-h-screen w-full bg-black px-4 py-6 sm:px-6 text-white">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-        <header className="flex items-center justify-between rounded-xl border border-[#C0C0C0] bg-black p-3">
+        <div className="text-sm text-[#C0C0C0]">Block Party Tycoon</div>
+        <CornerFrame className="flex items-center justify-between" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
           <div className="flex items-center gap-2">
             <input
               value={shopName}
@@ -122,18 +124,18 @@ export default function AppHome() {
               Co-op boost
             </label>
           </div>
-        </header>
+        </CornerFrame>
 
         <main className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <section className="col-span-2 rounded-2xl border border-[#C0C0C0] bg-black p-4">
+          <CornerFrame className="col-span-2" paddingClassName="p-4" cornerOffset={0} cornerRadius={0}>
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#C0C0C0]">Queue</h2>
             <div className="flex gap-2 overflow-x-auto pb-2">
               {queue.map((c) => (
-                <div key={c.id} className="min-w-[110px] rounded-xl border border-[#C0C0C0] bg-black p-3 text-center">
+                <CornerFrame key={c.id} className="min-w-[110px]" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
                   <div className="text-xs text-[#C0C0C0]">${c.spend}</div>
                   <div className="mt-2 text-lg">{c.mood === "happy" ? "😊" : c.mood === "neutral" ? "🙂" : "😠"}</div>
                   <div className="mt-1 text-[10px] uppercase text-[#C0C0C0]">Customer</div>
-                </div>
+                </CornerFrame>
               ))}
               {queue.length === 0 && <div className="text-sm text-[#C0C0C0]">Waiting for customers…</div>}
             </div>
@@ -142,45 +144,45 @@ export default function AppHome() {
               <button onClick={restock} className="rounded-xl border border-white px-4 py-3 text-white transition active:scale-[0.99] hover:bg-[#111111]">Restock</button>
               <button onClick={startBoost} className={`rounded-xl border border-white px-4 py-3 text-white transition active:scale-[0.99] ${boosting ? "bg-[#111111]" : "hover:bg-[#111111]"}`}>{boosting ? "Boosting…" : "Boost"}</button>
             </div>
-          </section>
+          </CornerFrame>
 
           <aside className="col-span-1 space-y-4">
-            <div className="rounded-2xl border border-[#C0C0C0] bg-black p-4">
+            <CornerFrame className="" paddingClassName="p-4" cornerOffset={0} cornerRadius={0}>
               <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#C0C0C0]">Upgrades</h3>
               <div className="space-y-2">
                 <UpgradeRow label="Fixtures" tier={fixturesTier} cost={(fixturesTier + 1) * 40} onUpgrade={() => setFixturesTier((t) => (t < 3 ? ((setCash((v) => v - (t + 1) * 40)), (t + 1 as UpgradeTier)) : t))} cash={cash} />
                 <UpgradeRow label="Product" tier={productTier} cost={(productTier + 1) * 50} onUpgrade={() => setProductTier((t) => (t < 3 ? ((setCash((v) => v - (t + 1) * 50)), (t + 1 as UpgradeTier)) : t))} cash={cash} />
-                <div className="flex items-center justify-between rounded-xl border border-[#C0C0C0] bg-black p-3">
+                <CornerFrame className="flex items-center justify-between" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
                   <div>
                     <div className="text-sm font-medium text-white">Auto Staff</div>
                     <div className="text-xs text-[#C0C0C0]">Serve passively during rush</div>
                   </div>
                   <button onClick={() => setAutoStaff((s) => !s)} className={`rounded-full border px-3 py-1 text-sm ${autoStaff ? "border-white text-white" : "border-[#C0C0C0] text-[#C0C0C0]"}`}>{autoStaff ? "On" : "Off"}</button>
-                </div>
+                </CornerFrame>
               </div>
-            </div>
+            </CornerFrame>
 
-            <div className="rounded-2xl border border-[#C0C0C0] bg-black p-4">
+            <CornerFrame className="" paddingClassName="p-4" cornerOffset={0} cornerRadius={0}>
               <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#C0C0C0]">Camera</h3>
               <div className="flex gap-2">
                 <button onClick={drawSelfie} className="rounded-xl border border-white px-3 py-2 text-sm text-white hover:bg-[#111111]">Selfie</button>
                 <button onClick={downloadCanvas} className="rounded-xl border border-white px-3 py-2 text-sm text-white hover:bg-[#111111]">Save PNG</button>
               </div>
-              <div className="mt-2 overflow-hidden rounded-xl border border-[#C0C0C0]">
+              <CornerFrame className="mt-2 overflow-hidden" paddingClassName="p-0" cornerOffset={0} cornerRadius={0}>
                 <canvas ref={canvasRef} className="block w-full" />
-              </div>
-            </div>
+              </CornerFrame>
+            </CornerFrame>
           </aside>
         </main>
 
         {auditOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-            <div className="w-full max-w-sm rounded-2xl border border-[#C0C0C0] bg-black p-5 shadow-xl">
+            <CornerFrame className="w-full max-w-sm shadow-xl" paddingClassName="p-5" cornerOffset={0} cornerRadius={0}>
               <div className="mb-3 text-2xl text-white">🧾 Ms. Ledger’s Audit</div>
               <p className="mb-4 text-sm text-[#C0C0C0]">Surprise inspection! Answer correctly to secure a license upgrade.</p>
               <AuditQuiz onPass={passAudit} onFail={failAudit} />
               <button onClick={() => setAuditOpen(false)} className="mt-3 w-full rounded-xl border border-[#C0C0C0] px-4 py-2 text-sm text-white hover:bg-[#111111]">Not now</button>
-            </div>
+            </CornerFrame>
           </div>
         )}
       </div>
