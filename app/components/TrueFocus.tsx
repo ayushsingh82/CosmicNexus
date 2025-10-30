@@ -9,6 +9,7 @@ interface TrueFocusProps {
   blurAmount?: number;
   borderColor?: string;
   glowColor?: string;
+  activeColor?: string;
   animationDuration?: number;
   pauseBetweenAnimations?: number;
 }
@@ -26,6 +27,7 @@ const TrueFocus: React.FC<TrueFocusProps> = ({
   blurAmount = 5,
   borderColor = "#C0C0C0",
   glowColor = "rgba(192, 192, 192, 0.6)",
+  activeColor = "#FFFFFF",
   animationDuration = 0.5,
   pauseBetweenAnimations = 1,
 }) => {
@@ -83,7 +85,7 @@ const TrueFocus: React.FC<TrueFocusProps> = ({
             }}
             className="relative text-[3rem] md:text-[4rem] font-black cursor-pointer"
             style={{
-              color: isActive ? "#ffffff" : "#C0C0C0",
+              color: isActive ? activeColor : "#C0C0C0",
               filter: isActive ? "blur(0px)" : `blur(${blurAmount}px)`,
               transition: `filter ${animationDuration}s ease, color ${animationDuration}s ease`,
             } as React.CSSProperties}

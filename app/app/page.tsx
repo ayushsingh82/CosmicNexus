@@ -105,7 +105,7 @@ export default function AppHome() {
   return (
     <div className="min-h-screen w-full bg-black px-4 py-6 sm:px-6 text-white">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-        <div className="text-sm text-[#C0C0C0]">Block Party Tycoon</div>
+        <div className="text-3xl font-bold text-white hover:text-[#EBF73F] transition-colors duration-300">Block Party Taycon</div>
         <CornerFrame className="flex items-center justify-between" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
           <div className="flex items-center gap-2">
             <input

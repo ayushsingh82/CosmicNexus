@@ -34,6 +34,7 @@ export default function LandingPage() {
           blurAmount={5}
           borderColor="#C0C0C0"
           glowColor="rgba(192,192,192,0.6)"
+          activeColor="#EBF73F"
           animationDuration={2}
           pauseBetweenAnimations={1}
         />
@@ -42,7 +43,7 @@ export default function LandingPage() {
         </p>
         <Link
           href="/app"
-          className="inline-block border border-white text-white font-bold text-xl py-5 px-12 transition duration-200 hover:bg-[#111111] relative"
+          className="inline-block bg-[#EBF73F] hover:bg-[#141414] text-black hover:text-white font-bold text-xl py-5 px-12 transition duration-200 shadow-lg relative"
         >
           <span className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-white"></span>
           <span className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-white"></span>
