@@ -23,9 +23,17 @@ export default function AppHome() {
   const [partyBoost, setPartyBoost] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [licenseLevel, setLicenseLevel] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [rushIn, setRushIn] = useState(12);
+  const [rushActive, setRushActive] = useState(false);
+  const [goalServe, setGoalServe] = useState(0);
+  const [goalEarn, setGoalEarn] = useState(0);
+  const [goalAudit, setGoalAudit] = useState(false);
+  const [prestige, setPrestige] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
+    const base = rushActive ? 900 : 1400;
     const interval = setInterval(() => {
       setQueue((prev) => {
         const newCust: Customer = {
@@ -36,9 +44,9 @@ export default function AppHome() {
         const capped = prev.slice(-4);
         return [...capped, newCust];
       });
-    }, 1400 - fixturesTier * 200);
+    }, Math.max(500, base - fixturesTier * 200));
     return () => clearInterval(interval);
-  }, [fixturesTier]);
+  }, [fixturesTier, rushActive]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -62,14 +70,46 @@ export default function AppHome() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const t = setInterval(() => {
+      setRushIn((s) => {
+        if (s <= 1) {
+          setRushActive((a) => !a);
+          return rushActive ? 12 : 8;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [rushActive]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("bpt_state");
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (typeof s.cash === "number") setCash(s.cash);
+        if (typeof s.fixturesTier === "number") setFixturesTier(s.fixturesTier);
+        if (typeof s.productTier === "number") setProductTier(s.productTier);
+        if (typeof s.prestige === "number") setPrestige(s.prestige);
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("bpt_state", JSON.stringify({ cash, fixturesTier, productTier, prestige }));
+    } catch {}
+  }, [cash, fixturesTier, productTier, prestige]);
+
   const spendMultiplier = useMemo(() => {
     const base = 1 + productTier * 0.35;
     const comboBonus = 1 + Math.min(combo, 10) * 0.05;
     const boost = boosting ? 1.3 : 1;
     const party = partyBoost ? 1.2 : 1;
     const license = 1 + licenseLevel * 0.15;
-    return base * comboBonus * boost * party * license;
-  }, [productTier, combo, boosting, partyBoost, licenseLevel]);
+    const prestigeBonus = 1 + prestige * 0.2;
+    return base * comboBonus * boost * party * license * prestigeBonus;
+  }, [productTier, combo, boosting, partyBoost, licenseLevel, prestige]);
 
   function serveTop(passive = false) {
     setQueue((prev) => {
@@ -79,13 +119,15 @@ export default function AppHome() {
       const earned = Math.round(top.spend * spendMultiplier * moodMul);
       setCash((v) => v + earned);
       setCombo((c) => Math.min(c + 1, 20));
+      if (!passive) setGoalServe((g) => Math.min(5, g + 1));
+      setGoalEarn((e) => Math.min(100, e + earned));
       return rest;
     });
   }
 
   function restock() { setCombo(0); }
   function startBoost() { if (!boosting) { setBoosting(true); setTimeout(() => setBoosting(false), 3000); } }
-  function passAudit() { setLicenseLevel((l) => Math.min(l + 1, 3)); setCash((v) => v + 50 + licenseLevel * 25); setAuditOpen(false); }
+  function passAudit() { setLicenseLevel((l) => Math.min(l + 1, 3)); setCash((v) => v + 50 + licenseLevel * 25); setGoalAudit(true); setAuditOpen(false); }
   function failAudit() { setCash((v) => Math.max(0, v - 30)); setAuditOpen(false); }
 
   function drawSelfie() {
@@ -105,7 +147,7 @@ export default function AppHome() {
   return (
     <div className="min-h-screen w-full bg-black px-4 py-6 sm:px-6 text-white">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-        <div className="text-3xl font-bold text-white hover:text-[#EBF73F] transition-colors duration-300"><a href="/">Block Party Taycon</a></div>
+        <div className="text-3xl font-extrabold text-white"><a href="/">Block Party Taycon</a></div>
         <CornerFrame className="flex items-center justify-between" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
           <div className="flex items-center gap-2">
             <input
@@ -115,6 +157,9 @@ export default function AppHome() {
               aria-label="Shop name"
             />
             <span className="rounded border border-[#C0C0C0] px-2 py-1 text-xs font-semibold text-white">L{licenseLevel}</span>
+            {prestige > 0 && (
+              <span className="rounded border border-[#C0C0C0] px-2 py-1 text-xs font-semibold text-white">Prestige {prestige}</span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <span className="rounded border border-[#C0C0C0] px-2 py-1 text-sm font-semibold text-white">${cash}</span>
@@ -126,9 +171,14 @@ export default function AppHome() {
           </div>
         </CornerFrame>
 
+        <CornerFrame className="flex items-center justify-between" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
+          <div className="text-sm text-[#C0C0C0]">Rush {rushActive ? "Active" : "Incoming"} in <span className="text-white font-semibold">{rushIn}s</span></div>
+          <div className="text-xs text-[#C0C0C0]">Tip: Serve during rush to earn more quickly.</div>
+        </CornerFrame>
+
         <main className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <CornerFrame className="col-span-2" paddingClassName="p-4" cornerOffset={0} cornerRadius={0}>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#C0C0C0]">Queue</h2>
+            <h2 className="mb-3 text-lg font-bold text-white">Queue</h2>
             <div className="flex gap-2 overflow-x-auto pb-2">
               {queue.map((c) => (
                 <CornerFrame key={c.id} className="min-w-[110px]" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
@@ -139,16 +189,17 @@ export default function AppHome() {
               ))}
               {queue.length === 0 && <div className="text-sm text-[#C0C0C0]">Waiting for customers…</div>}
             </div>
-            <div className="mt-4 flex items-center gap-2">
-              <button onClick={() => serveTop(false)} className="flex-1 rounded-xl border border-white px-4 py-3 text-white transition active:scale-[0.99] disabled:opacity-50 hover:bg-[#111111]" disabled={queue.length === 0}>Serve</button>
-              <button onClick={restock} className="rounded-xl border border-white px-4 py-3 text-white transition active:scale-[0.99] hover:bg-[#111111]">Restock</button>
-              <button onClick={startBoost} className={`rounded-xl border border-white px-4 py-3 text-white transition active:scale-[0.99] ${boosting ? "bg-[#111111]" : "hover:bg-[#111111]"}`}>{boosting ? "Boosting…" : "Boost"}</button>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <button onClick={() => serveTop(false)} className="rounded border border-white px-4 py-3 text-lg font-semibold text-white transition active:scale-[0.99] disabled:opacity-50 hover:bg-[#111111]" disabled={queue.length === 0}>Serve</button>
+              <button onClick={restock} className="rounded border border-white px-4 py-3 text-lg font-semibold text-white transition active:scale-[0.99] hover:bg-[#111111]">Restock</button>
+              <button onClick={startBoost} className={`rounded border border-white px-4 py-3 text-lg font-semibold text-white transition active:scale-[0.99] ${boosting ? "bg-[#111111]" : "hover:bg-[#111111]"}`}>{boosting ? "Boosting…" : "Boost"}</button>
             </div>
+            <div className="mt-2 text-xs text-[#C0C0C0]">Tip: Tap Serve to clear the first customer. Restock resets combo. Boost speeds earnings briefly.</div>
           </CornerFrame>
 
           <aside className="col-span-1 space-y-4">
             <CornerFrame className="" paddingClassName="p-4" cornerOffset={0} cornerRadius={0}>
-              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#C0C0C0]">Upgrades</h3>
+              <h3 className="mb-3 text-lg font-bold text-white">Upgrades</h3>
               <div className="space-y-2">
                 <UpgradeRow label="Fixtures" tier={fixturesTier} cost={(fixturesTier + 1) * 40} onUpgrade={() => setFixturesTier((t) => (t < 3 ? ((setCash((v) => v - (t + 1) * 40)), (t + 1 as UpgradeTier)) : t))} cash={cash} />
                 <UpgradeRow label="Product" tier={productTier} cost={(productTier + 1) * 50} onUpgrade={() => setProductTier((t) => (t < 3 ? ((setCash((v) => v - (t + 1) * 50)), (t + 1 as UpgradeTier)) : t))} cash={cash} />
@@ -163,7 +214,31 @@ export default function AppHome() {
             </CornerFrame>
 
             <CornerFrame className="" paddingClassName="p-4" cornerOffset={0} cornerRadius={0}>
-              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#C0C0C0]">Camera</h3>
+              <h3 className="mb-3 text-lg font-bold text-white">Goals</h3>
+              <div className="space-y-2 text-sm">
+                <GoalRow label="Serve 5 customers" done={goalServe >= 5} progress={`${goalServe}/5`} />
+                <GoalRow label="Earn $100" done={goalEarn >= 100} progress={`$${goalEarn}/$100`} />
+                <GoalRow label="Pass an audit" done={goalAudit} />
+              </div>
+            </CornerFrame>
+
+            <CornerFrame className="" paddingClassName="p-4" cornerOffset={0} cornerRadius={0}>
+              <h3 className="mb-3 text-lg font-bold text-white">Prestige</h3>
+              <div className="text-sm text-[#C0C0C0] mb-2">Reset progress for a permanent income bonus (+20% each prestige).</div>
+              <button
+                onClick={() => {
+                  if (cash < 300) return;
+                  setCash(0); setFixturesTier(0); setProductTier(0); setCombo(0); setPrestige((p) => p + 1);
+                }}
+                disabled={cash < 300}
+                className="rounded border border-white px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#111111]"
+              >
+                Prestige (cost $300)
+              </button>
+            </CornerFrame>
+
+            <CornerFrame className="" paddingClassName="p-4" cornerOffset={0} cornerRadius={0}>
+              <h3 className="mb-3 text-lg font-bold text-white">Camera</h3>
               <div className="flex gap-2">
                 <button onClick={drawSelfie} className="rounded-xl border border-white px-3 py-2 text-sm text-white hover:bg-[#111111]">Selfie</button>
                 <button onClick={downloadCanvas} className="rounded-xl border border-white px-3 py-2 text-sm text-white hover:bg-[#111111]">Save PNG</button>
@@ -182,6 +257,24 @@ export default function AppHome() {
               <p className="mb-4 text-sm text-[#C0C0C0]">Surprise inspection! Answer correctly to secure a license upgrade.</p>
               <AuditQuiz onPass={passAudit} onFail={failAudit} />
               <button onClick={() => setAuditOpen(false)} className="mt-3 w-full rounded-xl border border-[#C0C0C0] px-4 py-2 text-sm text-white hover:bg-[#111111]">Not now</button>
+            </CornerFrame>
+          </div>
+        )}
+
+        {showOnboarding && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+            <CornerFrame className="w-full max-w-2xl" paddingClassName="p-6" cornerOffset={0} cornerRadius={0}>
+              <div className="text-2xl font-extrabold mb-2 text-white">How to Play</div>
+              <ol className="list-decimal pl-6 space-y-2 text-lg">
+                <li>Tap <span className="font-semibold">Serve</span> to help the first customer in the Queue.</li>
+                <li>Use <span className="font-semibold">Upgrades</span> to speed spawn and increase earnings.</li>
+                <li>Watch for <span className="font-semibold">Rush</span> — serve quickly to earn more.</li>
+              </ol>
+              <div className="mt-4 text-sm text-[#C0C0C0]">Goal: Serve 5 customers and earn $100. Pass an audit for a license upgrade.</div>
+              <div className="mt-4 flex gap-2">
+                <button onClick={() => setShowOnboarding(false)} className="rounded border border-white px-4 py-2 text-sm font-semibold text-white hover:bg-[#111111]">Got it</button>
+                <button onClick={() => setShowOnboarding(false)} className="rounded border border-[#C0C0C0] px-4 py-2 text-sm text-white hover:bg-[#111111]">Skip</button>
+              </div>
             </CornerFrame>
           </div>
         )}
@@ -222,6 +315,15 @@ function AuditQuiz({ onPass, onFail }: { onPass: () => void; onFail: () => void 
         <button onClick={() => (choice === q.correct ? onPass() : onFail())} disabled={choice === null} className="flex-1 rounded-xl border border-white px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#111111]">Submit</button>
         <button onClick={onFail} className="rounded-xl border border-[#C0C0C0] px-4 py-2 text-sm text-white hover:bg-[#111111]">Fail</button>
       </div>
+    </div>
+  );
+}
+
+function GoalRow({ label, done, progress }: { label: string; done: boolean; progress?: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className={`text-sm ${done ? "text-white" : "text-[#C0C0C0]"}`}>{label}{progress ? ` – ${progress}` : ""}</div>
+      <div className={`text-xs ${done ? "text-white" : "text-[#C0C0C0]"}`}>{done ? "Done" : ""}</div>
     </div>
   );
 }
