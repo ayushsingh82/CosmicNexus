@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import CornerFrame from "@/app/components/CornerFrame";
 
 type Customer = {
@@ -30,7 +31,11 @@ export default function AppHome() {
   const [goalEarn, setGoalEarn] = useState(0);
   const [goalAudit, setGoalAudit] = useState(false);
   const [prestige, setPrestige] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [particles, setParticles] = useState<Array<{ id: string; x: number; y: number; }>>([]);
+  const [npcLine, setNpcLine] = useState("Welcome to the block. Keep it tidy, keep it moving.");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     const base = rushActive ? 900 : 1400;
@@ -121,13 +126,15 @@ export default function AppHome() {
       setCombo((c) => Math.min(c + 1, 20));
       if (!passive) setGoalServe((g) => Math.min(5, g + 1));
       setGoalEarn((e) => Math.min(100, e + earned));
+      triggerParticles();
+      playServe();
       return rest;
     });
   }
 
   function restock() { setCombo(0); }
-  function startBoost() { if (!boosting) { setBoosting(true); setTimeout(() => setBoosting(false), 3000); } }
-  function passAudit() { setLicenseLevel((l) => Math.min(l + 1, 3)); setCash((v) => v + 50 + licenseLevel * 25); setGoalAudit(true); setAuditOpen(false); }
+  function startBoost() { if (!boosting) { setBoosting(true); playBoost(); setTimeout(() => setBoosting(false), 3000); } }
+  function passAudit() { setLicenseLevel((l) => Math.min(l + 1, 3)); setCash((v) => v + 50 + licenseLevel * 25); setGoalAudit(true); setAuditOpen(false); playAudit(); setNpcLine("Audit passed. License upgraded. Impressive."); }
   function failAudit() { setCash((v) => Math.max(0, v - 30)); setAuditOpen(false); }
 
   function drawSelfie() {
@@ -143,6 +150,55 @@ export default function AppHome() {
     const canvas = canvasRef.current; if (!canvas) return; const link = document.createElement("a");
     link.download = "block-party.png"; link.href = canvas.toDataURL("image/png"); link.click();
   }
+
+  // Audio: lazy init context
+  function ensureAudio() {
+    if (!audioCtxRef.current) {
+      try { audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); } catch {}
+    }
+    return audioCtxRef.current;
+  }
+  function playTone(freq: number, time = 0.12, type: OscillatorType = "sine") {
+    if (muted) return;
+    const ctx = ensureAudio(); if (!ctx) return;
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = 0.0001; g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time);
+    o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + time);
+  }
+  function playServe() { playTone(520, 0.08, "triangle"); }
+  function playBoost() { playTone(200, 0.18, "square"); }
+  function playAudit() { playTone(640, 0.2, "sawtooth"); }
+
+  // Ambient pad
+  useEffect(() => {
+    if (muted) return; const ctx = ensureAudio(); if (!ctx) return;
+    let o: OscillatorNode | null = ctx.createOscillator();
+    let g: GainNode | null = ctx.createGain();
+    o!.type = "sine"; o!.frequency.value = 110;
+    g!.gain.value = 0.003;
+    o!.connect(g!).connect(ctx.destination); o!.start();
+    return () => { try { o && o.stop(); } catch {} o = null; g = null; };
+  }, [muted]);
+
+  // Particles
+  function triggerParticles() {
+    const id = Math.random().toString(36).slice(2);
+    const x = 40 + Math.random() * 40; const y = 50 + Math.random() * 20;
+    setParticles((p) => [...p, { id, x, y }].slice(-12));
+    setTimeout(() => setParticles((p) => p.filter((q) => q.id !== id)), 600);
+  }
+
+  // NPC rotating lines
+  useEffect(() => {
+    const lines = [
+      "Keep the queue flowing—happy customers tip more.",
+      "Restock before rush hits. Timing is profit.",
+      "Boost wisely; combos stack fast during rush.",
+    ];
+    const t = setInterval(() => setNpcLine(lines[Math.floor(Math.random() * lines.length)]), 7000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-black px-4 py-6 sm:px-6 text-white">
@@ -168,6 +224,10 @@ export default function AppHome() {
               <input type="checkbox" checked={partyBoost} onChange={(e) => setPartyBoost(e.target.checked)} />
               Co-op boost
             </label>
+            <label className="flex items-center gap-1 text-xs text-[#C0C0C0]">
+              <input type="checkbox" checked={muted} onChange={(e) => setMuted(e.target.checked)} />
+              Mute
+            </label>
           </div>
         </CornerFrame>
 
@@ -179,22 +239,41 @@ export default function AppHome() {
         <main className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <CornerFrame className="col-span-2" paddingClassName="p-4" cornerOffset={0} cornerRadius={0}>
             <h2 className="mb-3 text-lg font-bold text-white">Queue</h2>
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {queue.map((c) => (
-                <CornerFrame key={c.id} className="min-w-[110px]" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
-                  <div className="text-xs text-[#C0C0C0]">${c.spend}</div>
-                  <div className="mt-2 text-lg">{c.mood === "happy" ? "😊" : c.mood === "neutral" ? "🙂" : "😠"}</div>
-                  <div className="mt-1 text-[10px] uppercase text-[#C0C0C0]">Customer</div>
-                </CornerFrame>
-              ))}
+            <div className="flex gap-2 overflow-x-auto pb-2" onTouchStart={(e) => (touchStartRef.current = e.touches[0].clientX)} onTouchEnd={(e) => {
+              const end = e.changedTouches[0].clientX; if (touchStartRef.current !== null && end - touchStartRef.current > 40) serveTop(false); touchStartRef.current = null;
+            }}>
+              <AnimatePresence initial={false}>
+                {queue.map((c) => (
+                  <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+                    <CornerFrame className="min-w-[110px]" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
+                      <div className="text-xs text-[#C0C0C0]">${c.spend}</div>
+                      <div className="mt-2 text-lg">{c.mood === "happy" ? "😊" : c.mood === "neutral" ? "🙂" : "😠"}</div>
+                      <div className="mt-1 text-[10px] uppercase text-[#C0C0C0]">Customer</div>
+                    </CornerFrame>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
               {queue.length === 0 && <div className="text-sm text-[#C0C0C0]">Waiting for customers…</div>}
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <button onClick={() => serveTop(false)} className="rounded border border-white px-4 py-3 text-lg font-semibold text-white transition active:scale-[0.99] disabled:opacity-50 hover:bg-[#111111]" disabled={queue.length === 0}>Serve</button>
-              <button onClick={restock} className="rounded border border-white px-4 py-3 text-lg font-semibold text-white transition active:scale-[0.99] hover:bg-[#111111]">Restock</button>
-              <button onClick={startBoost} className={`rounded border border-white px-4 py-3 text-lg font-semibold text-white transition active:scale-[0.99] ${boosting ? "bg-[#111111]" : "hover:bg-[#111111]"}`}>{boosting ? "Boosting…" : "Boost"}</button>
+              <motion.button whileTap={{ scale: 0.98 }} onClick={() => serveTop(false)} className="rounded border border-white px-4 py-3 text-lg font-semibold text-white transition disabled:opacity-50 hover:bg-[#111111]" disabled={queue.length === 0}>Serve</motion.button>
+              <motion.button whileTap={{ scale: 0.98 }} onClick={restock} className="rounded border border-white px-4 py-3 text-lg font-semibold text-white transition hover:bg-[#111111]">Restock</motion.button>
+              <motion.button whileTap={{ scale: 0.98 }} onClick={startBoost} className={`rounded border border-white px-4 py-3 text-lg font-semibold text-white transition ${boosting ? "bg-[#111111]" : "hover:bg-[#111111]"}`}>{boosting ? "Boosting…" : "Boost"}</motion.button>
             </div>
             <div className="mt-2 text-xs text-[#C0C0C0]">Tip: Tap Serve to clear the first customer. Restock resets combo. Boost speeds earnings briefly.</div>
+
+            {/* Particles */}
+            <div className="pointer-events-none relative h-0">
+              <AnimatePresence>
+                {particles.map((p) => (
+                  <motion.span key={p.id} initial={{ opacity: 0, y: 0 }} animate={{ opacity: 1, y: -24 }} exit={{ opacity: 0, y: -40 }} transition={{ duration: 0.6 }}
+                    className="absolute text-white"
+                    style={{ left: `${p.x}%`, top: `${p.y}%` }}>
+                    +
+                  </motion.span>
+                ))}
+              </AnimatePresence>
+            </div>
           </CornerFrame>
 
           <aside className="col-span-1 space-y-4">
@@ -249,6 +328,11 @@ export default function AppHome() {
             </CornerFrame>
           </aside>
         </main>
+
+        {/* NPC banner */}
+        <CornerFrame className="" paddingClassName="p-3" cornerOffset={0} cornerRadius={0}>
+          <div className="text-sm"><span className="mr-2">🧾 Ms. Ledger:</span><span className="text-[#C0C0C0]">{npcLine}</span></div>
+        </CornerFrame>
 
         {auditOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
@@ -318,6 +402,8 @@ function AuditQuiz({ onPass, onFail }: { onPass: () => void; onFail: () => void 
     </div>
   );
 }
+
+const touchStartRef = { current: null as number | null };
 
 function GoalRow({ label, done, progress }: { label: string; done: boolean; progress?: string }) {
   return (
