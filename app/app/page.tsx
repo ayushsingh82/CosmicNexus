@@ -24,6 +24,25 @@ type Artifact = {
   collected: boolean;
 };
 
+type Character = {
+  name: string;
+  level: number;
+  experience: number;
+  experienceToNext: number;
+  abilities: {
+    speed: number;
+    energyEfficiency: number;
+    artifactSense: number;
+  };
+  appearance: {
+    color: string;
+    size: number;
+    glow: number;
+  };
+};
+
+type Direction = "up" | "down" | "left" | "right" | "idle";
+
 const REALM_CONFIGS: Record<RealmType, { 
   name: string; 
   skybox: string; 
@@ -69,6 +88,8 @@ export default function AppHome() {
   const [npcs, setNpcs] = useState<NPC[]>([]);
   const [selectedNpc, setSelectedNpc] = useState<NPC | null>(null);
   const [playerPosition, setPlayerPosition] = useState({ x: 50, y: 50 });
+  const [facingDirection, setFacingDirection] = useState<Direction>("idle");
+  const [isMoving, setIsMoving] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [muted, setMuted] = useState(false);
   const [discoveredRealms, setDiscoveredRealms] = useState<RealmType[]>(["cosmic"]);
@@ -76,10 +97,27 @@ export default function AppHome() {
   const [particles, setParticles] = useState<Array<{ id: string; x: number; y: number; color: string }>>([]);
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [npcInteractionHistory, setNpcInteractionHistory] = useState<Record<string, number>>({});
+  const [character, setCharacter] = useState<Character>({
+    name: "Nexus Explorer",
+    level: 1,
+    experience: 0,
+    experienceToNext: 100,
+    abilities: {
+      speed: 1,
+      energyEfficiency: 1,
+      artifactSense: 1,
+    },
+    appearance: {
+      color: "#EBF73F",
+      size: 1,
+      glow: 1,
+    },
+  });
   
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ambientAudioRef = useRef<AudioNode | null>(null);
-  const ambientOscillatorsRef = useRef<OscillatorNode[]>([]);
+  const ambientOscillatorsRef = useRef<Array<{ osc: OscillatorNode; gain: GainNode; lfo?: OscillatorNode; noise?: AudioBufferSourceNode }>>([]);
+  const movementSFXRef = useRef<AudioBufferSourceNode | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Initialize realm with AI-generated content
@@ -262,11 +300,15 @@ export default function AppHome() {
     return true;
   }
 
-  // AI-Generated Ambient Audio with procedural generation
+  // AI-Generated Pleasant Ambient Audio - Soothing and Musical
   useEffect(() => {
     if (!audioInitialized || muted) {
-      ambientOscillatorsRef.current.forEach(osc => {
-        try { osc.stop(); } catch {}
+      ambientOscillatorsRef.current.forEach(({ osc, lfo, noise }) => {
+    try {
+          osc.stop();
+          lfo?.stop();
+          noise?.stop();
+    } catch {}
       });
       ambientOscillatorsRef.current = [];
       return;
@@ -275,54 +317,87 @@ export default function AppHome() {
     const ctx = ensureAudio();
     if (!ctx || ctx.state !== "running") return;
 
-    // Procedurally generate frequencies based on realm
-    const baseFreqs = {
-      cosmic: 110,
-      crystal: 131,
-      neon: 147,
-      void: 98,
-      zenith: 165,
+    // Pleasant musical frequencies (in Hz) - using harmonious intervals
+    const realmChords: Record<RealmType, number[]> = {
+      cosmic: [130.81, 164.81, 196.00], // C3, E3, G3 - C major
+      crystal: [146.83, 174.61, 220.00], // D3, F3, A3 - D minor
+      neon: [164.81, 207.65, 246.94], // E3, G#3, B3 - E major
+      void: [98.00, 123.47, 146.83], // G2, B2, D3 - G major
+      zenith: [174.61, 220.00, 261.63], // F3, A3, C4 - F major
     };
 
-    const baseFreq = baseFreqs[currentRealm];
-    const freqs = [
-      baseFreq,
-      baseFreq * 1.5 + Math.random() * 10 - 5,
-      baseFreq * 2 + Math.random() * 10 - 5,
-    ];
+    const frequencies = realmChords[currentRealm];
+    const nodes: Array<{ osc: OscillatorNode; gain: GainNode; lfo?: OscillatorNode; noise?: AudioBufferSourceNode }> = [];
 
-    const oscillators: OscillatorNode[] = [];
-    const gains: GainNode[] = [];
-
-    freqs.forEach((freq, idx) => {
+    // Create pleasant ambient pad with gentle chord
+    frequencies.forEach((freq, idx) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      const oscType: OscillatorType[] = ["sine", "triangle", "sawtooth"];
-      osc.type = oscType[idx % 3];
+      const filter = ctx.createBiquadFilter();
+      
+      // Use sine waves for pure, pleasant tones
+      osc.type = "sine";
       osc.frequency.value = freq;
       
-      // Add subtle LFO for ambient movement
+      // Very gentle LFO for subtle movement (much slower and softer)
       const lfo = ctx.createOscillator();
       const lfoGain = ctx.createGain();
-      lfo.frequency.value = 0.1 + Math.random() * 0.2;
-      lfoGain.gain.value = 2 + Math.random() * 3;
+      lfo.type = "sine";
+      lfo.frequency.value = 0.02 + Math.random() * 0.03; // Very slow, barely noticeable
+      lfoGain.gain.value = 0.5 + Math.random() * 0.5; // Very subtle pitch variation
       lfo.connect(lfoGain);
       lfoGain.connect(osc.frequency);
       lfo.start();
       
-      gain.gain.value = idx === 0 ? 0.02 : idx === 1 ? 0.01 : 0.005;
-      osc.connect(gain).connect(ctx.destination);
+      // Soft lowpass filter for warmth
+      filter.type = "lowpass";
+      filter.frequency.value = 2000 + Math.random() * 500; // Gentle high-frequency rolloff
+      filter.Q.value = 0.5; // Low Q for smooth, not sharp
+      
+      // Soft gain levels
+      gain.gain.value = idx === 0 ? 0.006 : idx === 1 ? 0.004 : 0.003;
+      
+      osc.connect(filter).connect(gain).connect(ctx.destination);
       osc.start();
-      oscillators.push(osc);
-      gains.push(gain);
+      nodes.push({ osc, gain, lfo });
     });
 
-    ambientOscillatorsRef.current = oscillators;
-    ambientAudioRef.current = gains[0];
+    // Add one very subtle high-frequency layer for sparkle (much quieter)
+    const sparkleOsc = ctx.createOscillator();
+    const sparkleGain = ctx.createGain();
+    const sparkleFilter = ctx.createBiquadFilter();
+    const sparkleLFO = ctx.createOscillator();
+    const sparkleLFOGain = ctx.createGain();
+    
+    sparkleOsc.type = "sine";
+    sparkleOsc.frequency.value = frequencies[2] * 2; // Octave above highest chord tone
+    
+    sparkleLFO.type = "sine";
+    sparkleLFO.frequency.value = 0.1 + Math.random() * 0.1; // Gentle shimmer
+    sparkleLFOGain.gain.value = 2 + Math.random() * 2; // Subtle variation
+    sparkleLFO.connect(sparkleLFOGain);
+    sparkleLFOGain.connect(sparkleOsc.frequency);
+    sparkleLFO.start();
+    
+    sparkleFilter.type = "lowpass";
+    sparkleFilter.frequency.value = 5000;
+    sparkleFilter.Q.value = 1;
+    
+    sparkleGain.gain.value = 0.001; // Very quiet sparkle
+    sparkleOsc.connect(sparkleFilter).connect(sparkleGain).connect(ctx.destination);
+    sparkleOsc.start();
+    nodes.push({ osc: sparkleOsc, gain: sparkleGain, lfo: sparkleLFO });
+
+    ambientOscillatorsRef.current = nodes;
+    ambientAudioRef.current = nodes[0].gain;
 
     return () => {
-      oscillators.forEach(osc => {
-        try { osc.stop(); } catch {}
+      nodes.forEach(({ osc, lfo, noise }) => {
+        try {
+          osc.stop();
+          lfo?.stop();
+          noise?.stop();
+        } catch {}
       });
       ambientOscillatorsRef.current = [];
     };
@@ -337,43 +412,152 @@ export default function AppHome() {
     return audioCtxRef.current;
   }
 
-  // AI-Generated SFX with procedural variation
-  function playSFX(type: "collect" | "portal" | "interact" | "discover" | "energy") {
+  // AI-Generated SFX with realistic, rich sounds
+  function playSFX(type: "collect" | "portal" | "interact" | "discover" | "energy" | "movement") {
     if (muted || !audioInitialized) return;
     const ctx = ensureAudio();
     if (!ctx || ctx.state !== "running") return;
 
-    // Procedurally generate frequencies with variation
-    const baseConfigs = {
-      collect: { freq: 800, duration: 0.2, type: "triangle" as OscillatorType },
-      portal: { freq: 400, duration: 0.4, type: "sawtooth" as OscillatorType },
-      interact: { freq: 600, duration: 0.15, type: "square" as OscillatorType },
-      discover: { freq: 1000, duration: 0.3, type: "sine" as OscillatorType },
-      energy: { freq: 350, duration: 0.25, type: "triangle" as OscillatorType },
-    };
+    const now = ctx.currentTime;
 
-    const base = baseConfigs[type];
-    // Add variation to make it more dynamic
-    const freqVariation = base.freq + (Math.random() * 100 - 50);
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-    
-    osc.type = base.type;
-    osc.frequency.value = freqVariation;
-    
-    // Add filter for richer sound
-    filter.type = "lowpass";
-    filter.frequency.value = freqVariation * 2;
-    filter.Q.value = 10;
-    
-    gain.gain.value = 0.0001;
-    gain.gain.exponentialRampToValueAtTime(0.003, ctx.currentTime + base.duration * 0.3);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + base.duration);
-    
-    osc.connect(filter).connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + base.duration);
+    if (type === "collect") {
+      // Rich collect sound - ascending chime
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(600, now);
+      osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
+      
+      osc2.type = "triangle";
+      osc2.frequency.setValueAtTime(800, now);
+      osc2.frequency.exponentialRampToValueAtTime(1600, now + 0.15);
+      
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(4000, now);
+      filter.frequency.exponentialRampToValueAtTime(2000, now + 0.15);
+      
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.008, now + 0.02); // Softer
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain).connect(ctx.destination);
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.15);
+      osc2.stop(now + 0.15);
+    } else if (type === "portal") {
+      // Portal - sweeping whoosh with pitch bend
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(200, now);
+      osc.frequency.exponentialRampToValueAtTime(600, now + 0.3);
+      osc.frequency.exponentialRampToValueAtTime(150, now + 0.5);
+      
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(500, now);
+      filter.frequency.linearRampToValueAtTime(3000, now + 0.25);
+      filter.frequency.exponentialRampToValueAtTime(500, now + 0.5);
+      filter.Q.value = 2; // Gentler filter
+      
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.012, now + 0.1); // Softer
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      
+      osc.connect(filter).connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.5);
+    } else if (type === "interact") {
+      // Interact - pleasant blip
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(1000, now + 0.05);
+      
+      filter.type = "lowpass";
+      filter.frequency.value = 2000;
+      filter.Q.value = 3;
+      
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      
+      osc.connect(filter).connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.1);
+    } else if (type === "discover") {
+      // Discover - magical ascending chord
+      const freqs = [523.25, 659.25, 783.99]; // C, E, G
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + idx * 0.05);
+        gain.gain.linearRampToValueAtTime(0.008, now + idx * 0.05 + 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + idx * 0.05);
+        osc.stop(now + 0.4);
+      });
+    } else if (type === "energy") {
+      // Energy - pulsing tone
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      
+      osc.type = "sine";
+      osc.frequency.value = 440;
+      
+      lfo.type = "sine";
+      lfo.frequency.value = 8;
+      lfoGain.gain.value = 0.3;
+      lfo.connect(lfoGain);
+      lfoGain.connect(gain.gain);
+      lfo.start();
+      
+      gain.gain.value = 0.01;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.2);
+      lfo.stop(now + 0.2);
+    } else if (type === "movement") {
+      // Movement - gentle soft sweep
+      if (movementSFXRef.current) {
+        try { movementSFXRef.current.stop(); } catch {}
+      }
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      
+      osc.type = "sine"; // Changed to sine for softer sound
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.exponentialRampToValueAtTime(350, now + 0.08);
+      
+      filter.type = "lowpass"; // Changed to lowpass for warmth
+      filter.frequency.setValueAtTime(1500, now);
+      filter.Q.value = 1; // Gentle filter
+      
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.002, now + 0.02); // Much quieter
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+      
+      osc.connect(filter).connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.08);
+    }
   }
 
   function collectArtifact(artifactId: string) {
@@ -383,6 +567,49 @@ export default function AppHome() {
         triggerParticles(REALM_CONFIGS[currentRealm].ambientColor);
         setEnergy(e => Math.min(100, e + 10));
         setQuestProgress(p => p + 1);
+        
+        // Give experience based on rarity
+        const rarityExp: Record<string, number> = {
+          common: 10,
+          rare: 25,
+          epic: 50,
+          legendary: 100,
+        };
+        
+        const expGain = rarityExp[a.rarity] || 10;
+        setCharacter(prevChar => {
+          let newExp = prevChar.experience + expGain;
+          let newLevel = prevChar.level;
+          let expToNext = prevChar.experienceToNext;
+          
+          // Level up if enough experience
+          while (newExp >= expToNext) {
+            newExp -= expToNext;
+            newLevel++;
+            expToNext = Math.floor(expToNext * 1.5); // Exponential growth
+            
+            // Level up bonuses
+            playSFX("discover");
+            setEnergy(e => Math.min(100, e + 20)); // Restore energy on level up
+          }
+          
+          return {
+            ...prevChar,
+            level: newLevel,
+            experience: newExp,
+            experienceToNext: expToNext,
+            abilities: {
+              speed: 1 + (newLevel - 1) * 0.1,
+              energyEfficiency: 1 + (newLevel - 1) * 0.15,
+              artifactSense: 1 + (newLevel - 1) * 0.05,
+            },
+            appearance: {
+              ...prevChar.appearance,
+              glow: 1 + (newLevel - 1) * 0.1,
+            },
+          };
+        });
+        
         return { ...a, collected: true };
       }
       return a;
@@ -438,15 +665,22 @@ export default function AppHome() {
   }
 
   function movePlayer(direction: "up" | "down" | "left" | "right") {
-    if (energy < 5) return;
+    const energyCost = Math.max(1, Math.floor(2 / character.abilities.energyEfficiency));
+    if (energy < energyCost) return;
     
+    setFacingDirection(direction);
+    setIsMoving(true);
+    playSFX("movement");
+    
+    const moveDistance = 5 * character.abilities.speed;
     setPlayerPosition(prev => {
       const newPos = {
-        x: Math.max(10, Math.min(90, prev.x + (direction === "left" ? -5 : direction === "right" ? 5 : 0))),
-        y: Math.max(10, Math.min(90, prev.y + (direction === "up" ? -5 : direction === "down" ? 5 : 0))),
+        x: Math.max(10, Math.min(90, prev.x + (direction === "left" ? -moveDistance : direction === "right" ? moveDistance : 0))),
+        y: Math.max(10, Math.min(90, prev.y + (direction === "up" ? -moveDistance : direction === "down" ? moveDistance : 0))),
       };
       
-      // Check proximity to NPCs and artifacts after movement
+      // Check proximity to NPCs and artifacts after movement (enhanced range with artifact sense)
+      const senseRange = 6 + character.abilities.artifactSense * 2;
       setTimeout(() => {
         const nearbyNPC = npcs.find(npc => {
           const dist = Math.sqrt(Math.pow(newPos.x - npc.x, 2) + Math.pow(newPos.y - npc.y, 2));
@@ -455,16 +689,17 @@ export default function AppHome() {
         const nearbyArtifact = artifacts.find(art => {
           if (art.collected) return false;
           const dist = Math.sqrt(Math.pow(newPos.x - art.x, 2) + Math.pow(newPos.y - art.y, 2));
-          return dist < 6;
+          return dist < senseRange;
         });
         if (nearbyArtifact) collectArtifact(nearbyArtifact.id);
         if (nearbyNPC && !selectedNpc) interactWithNPC(nearbyNPC);
       }, 50);
       
+      setTimeout(() => setIsMoving(false), 200);
       return newPos;
     });
     
-    setEnergy(e => Math.max(0, e - 2));
+    setEnergy(e => Math.max(0, e - energyCost));
   }
 
   // Energy regeneration
@@ -503,8 +738,22 @@ export default function AppHome() {
 
         {/* Status Bar */}
         <CornerFrame className="flex items-center justify-between" paddingClassName="p-3">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Character Info */}
             <div className="flex items-center gap-2">
+              <div className="text-sm font-semibold text-white">{character.name}</div>
+              <div className="text-xs text-[#C0C0C0]">Lv.{character.level}</div>
+              <div className="w-24 h-2 bg-black/50 border border-[#C0C0C0] rounded relative overflow-hidden">
+                <motion.div
+                  className="h-full bg-yellow-400"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(character.experience / character.experienceToNext) * 100}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            </div>
+            
+          <div className="flex items-center gap-2">
               <span className="text-sm text-[#C0C0C0]">Energy:</span>
               <div className="w-32 h-4 bg-black/50 border border-[#C0C0C0] rounded relative overflow-hidden">
                 <motion.div
@@ -569,24 +818,117 @@ export default function AppHome() {
                 }}
               />
 
-              {/* Player */}
+              {/* Character */}
               <motion.div
-                className="absolute w-6 h-6 rounded-full border-2 border-white z-20"
+                className="absolute z-20 flex items-center justify-center"
                 style={{
-                  background: currentRealmConfig.ambientColor,
                   left: `${playerPosition.x}%`,
                   top: `${playerPosition.y}%`,
                   transform: "translate(-50%, -50%)",
-                  boxShadow: `0 0 20px ${currentRealmConfig.ambientColor}`,
+                  width: `${24 * character.appearance.size}px`,
+                  height: `${24 * character.appearance.size}px`,
                 }}
                 animate={{
-                  scale: [1, 1.2, 1],
+                  scale: isMoving ? [1, 1.1, 1] : [1, 1.05, 1],
+                  rotate: facingDirection === "left" ? -5 : facingDirection === "right" ? 5 : 0,
                 }}
                 transition={{
-                  duration: 2,
-                  repeat: Infinity,
+                  duration: 0.3,
+                  repeat: isMoving ? Infinity : 0,
                 }}
-              />
+              >
+                {/* Character Glow */}
+                <motion.div
+                  className="absolute rounded-full"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    background: `radial-gradient(circle, ${character.appearance.color}${Math.floor(character.appearance.glow * 100).toString(16)}, transparent 70%)`,
+                    filter: `blur(${8 * character.appearance.glow}px)`,
+                  }}
+                  animate={{
+                    opacity: [0.4, 0.7, 0.4],
+                    scale: [1, 1.2, 1],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                  }}
+                />
+                
+                {/* Character Body */}
+                <motion.div
+                  className="absolute rounded-full border-2 z-10"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    background: `linear-gradient(135deg, ${character.appearance.color}, ${currentRealmConfig.ambientColor})`,
+                    borderColor: character.appearance.color,
+                    boxShadow: `0 0 ${20 * character.appearance.glow}px ${character.appearance.color}`,
+                  }}
+                  animate={
+                    isMoving
+                      ? {
+                          y: [0, -3, 0],
+                        }
+                      : {}
+                  }
+                  transition={{
+                    duration: 0.4,
+                    repeat: isMoving ? Infinity : 0,
+                  }}
+                >
+                  {/* Character Face/Eyes */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <motion.div
+                        className="w-1 h-1 rounded-full bg-white"
+                        animate={{
+                          scale: [1, 1.2, 1],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                        }}
+                      />
+                      <motion.div
+                        className="w-1 h-1 rounded-full bg-white"
+                        animate={{
+                          scale: [1, 1.2, 1],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          delay: 0.2,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Character Level Badge */}
+                  {character.level > 1 && (
+                    <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-yellow-400 border border-white flex items-center justify-center">
+                      <span className="text-[8px] font-bold text-black">{character.level}</span>
+                    </div>
+                  )}
+                </motion.div>
+                
+                {/* Movement Trail */}
+                {isMoving && (
+                  <motion.div
+                    className="absolute rounded-full"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      background: character.appearance.color,
+                      opacity: 0.3,
+                    }}
+                    initial={{ scale: 1, opacity: 0.5 }}
+                    animate={{ scale: 1.5, opacity: 0 }}
+                    transition={{ duration: 0.4, repeat: Infinity }}
+                  />
+                )}
+              </motion.div>
 
               {/* AI-Generated NPCs */}
               <AnimatePresence>
@@ -645,13 +987,13 @@ export default function AppHome() {
                         {artifact.rarity === "epic" && "✨"}
                         {artifact.rarity === "rare" && "⭐"}
                         {artifact.rarity === "common" && "🔷"}
-                      </div>
+            </div>
                     </motion.div>
                   )
                 ))}
               </AnimatePresence>
 
-              {/* Particles */}
+            {/* Particles */}
               <AnimatePresence>
                 {particles.map((p) => (
                   <motion.span
@@ -742,6 +1084,31 @@ export default function AppHome() {
                     )}
                   </motion.button>
                 ))}
+              </div>
+            </CornerFrame>
+
+            {/* Character Stats */}
+            <CornerFrame paddingClassName="p-4">
+              <h3 className="mb-3 text-lg font-bold text-white">Character Stats</h3>
+              <div className="space-y-2 text-sm mb-4">
+                <div className="flex justify-between">
+                  <span className="text-[#C0C0C0]">Speed:</span>
+                  <span className="text-white font-semibold">{(character.abilities.speed * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#C0C0C0]">Energy Efficiency:</span>
+                  <span className="text-white font-semibold">{(character.abilities.energyEfficiency * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#C0C0C0]">Artifact Sense:</span>
+                  <span className="text-white font-semibold">{(character.abilities.artifactSense * 100).toFixed(0)}%</span>
+                </div>
+                <div className="mt-3 pt-3 border-t border-[#C0C0C0]/30">
+                  <div className="text-xs text-[#C0C0C0]">Experience:</div>
+                  <div className="text-sm text-white font-semibold">
+                    {character.experience} / {character.experienceToNext} XP
+                  </div>
+                </div>
               </div>
             </CornerFrame>
 
