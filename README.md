@@ -1,7 +1,5 @@
 # 🌌 Cosmic Nexus
 
-**An immersive AI-powered exploration game built with Next.js and Web Audio API**
-
 Cosmic Nexus is an interactive exploration experience where players journey through procedurally generated realms, interact with AI-powered NPCs, collect artifacts, and customize their character through an XP-based progression system.
 
 ## ✨ Features
@@ -84,57 +82,9 @@ Cosmic Nexus is an interactive exploration experience where players journey thro
   - Visual upgrades (glow intensity increases with level)
   - Energy restoration on level up
 
-## 🛠️ Tech Stack
 
-- **Framework**: Next.js 16.0.1
-- **Language**: TypeScript 5
-- **UI Library**: React 19.2.0
-- **Styling**: Tailwind CSS 4
-- **Animations**: Motion (Framer Motion) 12.23.24
-- **Audio**: Web Audio API (procedural audio generation)
-- **Build Tool**: Next.js built-in bundler
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js 18+ installed
-- npm, yarn, pnpm, or bun package manager
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd my-app
-```
-
-2. Install dependencies:
-```bash
-npm install
-# or
-yarn install
-# or
-pnpm install
-```
-
-3. Run the development server:
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
-
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
-
-### Building for Production
-
-```bash
-npm run build
-npm start
-```
+`
 
 ## 🎯 How to Play
 
@@ -169,24 +119,7 @@ The game uses procedural audio generation for all sounds:
 
 All audio is generated in real-time using Web Audio API oscillators, filters, and LFOs.
 
-## 📁 Project Structure
 
-```
-my-app/
-├── app/
-│   ├── app/
-│   │   └── page.tsx          # Main game page
-│   ├── components/
-│   │   ├── CornerFrame.tsx   # UI component with corner decorations
-│   │   ├── LandingPage.tsx   # Landing page component
-│   │   └── TrueFocus.tsx     # Text animation component
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Home page (routes to landing)
-├── public/                   # Static assets
-├── lib/
-│   └── utils.ts             # Utility functions
-└── package.json             # Dependencies and scripts
-```
 
 ## 🎮 Game Mechanics
 
@@ -278,14 +211,6 @@ The game demonstrates seven key AI/Generation features:
 - ✅ Procedurally generated SFX (sound effects)
 - ✅ Dynamic texture/environment visuals
 
-## 🛠️ How we built it
-
-### Technology Stack
-- **Frontend Framework**: Next.js 16 with React 19 and TypeScript
-- **Styling**: Tailwind CSS 4 for responsive, modern UI
-- **Animations**: Motion (Framer Motion) for smooth character and UI animations
-- **Audio**: Web Audio API for all procedural audio generation
-- **State Management**: React hooks (useState, useEffect, useRef) for game state
 
 ### Architecture & Implementation
 
@@ -418,38 +343,8 @@ All audio is generated using Web Audio API oscillators, filters, and LFOs - no p
 
 8. **Polished UX**: Smooth animations, particle effects, visual feedback, and intuitive controls create an engaging experience.
 
-## 📚 What we learned
 
-### Technical Learnings
 
-1. **Web Audio API Mastery**:
-   - How to create complex audio synthesis with oscillators, filters, and LFOs
-   - Managing audio context lifecycle (suspension, resumption)
-   - Creating musical, pleasant sounds vs. harsh noise
-   - Performance optimization for multiple audio nodes
-
-2. **Procedural Generation Techniques**:
-   - Template-based content generation for scalability
-   - Weighted random distributions for balanced rarity
-   - Context-aware content selection
-   - Balancing uniqueness with coherence
-
-3. **React State Management**:
-   - Complex state dependencies and how to structure them
-   - useEffect cleanup patterns for audio resources
-   - Performance optimization with useRef and memoization
-   - Separating UI state from game state
-
-4. **Game Design Principles**:
-   - Balancing progression curves (exponential vs. linear)
-   - Creating meaningful choices (shop purchases)
-   - Feedback loops (XP → upgrades → easier gameplay → more XP)
-   - Energy management as core gameplay mechanic
-
-5. **Browser Limitations & Solutions**:
-   - Audio autoplay restrictions and how to handle them
-   - Memory management for long-running applications
-   - Performance profiling and optimization
 
 ### Creative Learnings
 
