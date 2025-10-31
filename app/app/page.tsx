@@ -113,6 +113,9 @@ export default function AppHome() {
       glow: 1,
     },
   });
+  const [totalXP, setTotalXP] = useState(0); // Total XP earned (currency)
+  const [shopOpen, setShopOpen] = useState(false);
+  const [ownedGifts, setOwnedGifts] = useState<Set<string>>(new Set());
   
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ambientAudioRef = useRef<AudioNode | null>(null);
@@ -576,7 +579,16 @@ export default function AppHome() {
           legendary: 100,
         };
         
-        const expGain = rarityExp[a.rarity] || 10;
+        let expGain = rarityExp[a.rarity] || 10;
+        
+        // Apply XP multiplier if owned
+        if (ownedGifts.has("xpmult")) {
+          expGain = Math.floor(expGain * 1.25);
+        }
+        
+        // Add to total XP (currency)
+        setTotalXP(prev => prev + expGain);
+        
         setCharacter(prevChar => {
           let newExp = prevChar.experience + expGain;
           let newLevel = prevChar.level;
@@ -732,8 +744,23 @@ export default function AppHome() {
       />
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 relative z-10">
-        <div className="text-3xl font-extrabold text-white">
-          <a href="/">Cosmic Nexus</a>
+        <div className="flex items-center justify-between">
+          <div className="text-3xl font-extrabold text-white">
+            <a href="/">Cosmic Nexus</a>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-[#C0C0C0]">
+              Total XP: <span className="text-yellow-400 font-semibold">{totalXP}</span>
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShopOpen(true)}
+              className="rounded border border-[#EBF73F] px-4 py-2 text-sm font-semibold text-[#EBF73F] hover:bg-[#EBF73F]/10 flex items-center gap-2"
+            >
+              <span>🎁</span>
+              <span>Shop</span>
+            </motion.button>
+          </div>
         </div>
 
         {/* Status Bar */}
@@ -1200,6 +1227,261 @@ export default function AppHome() {
               >
                 Continue
               </button>
+            </CornerFrame>
+          </div>
+        )}
+
+        {/* Shop Modal */}
+        {shopOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+            <CornerFrame className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" paddingClassName="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-extrabold text-white">🎁 Gift Shop</h2>
+                  <p className="text-sm text-[#C0C0C0] mt-1">Spend your XP on special gifts and upgrades</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-[#C0C0C0]">Your XP:</div>
+                  <div className="text-2xl font-bold text-yellow-400">{totalXP}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Speed Boost Gift */}
+                <CornerFrame paddingClassName="p-4" className="border-2">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="text-3xl">⚡</div>
+                    <div className={`text-xs px-2 py-1 rounded ${ownedGifts.has("speed") ? "bg-green-500/20 text-green-400" : "bg-[#C0C0C0]/20 text-[#C0C0C0]"}`}>
+                      {ownedGifts.has("speed") ? "Owned" : "Available"}
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">Speed Boost</h3>
+                  <p className="text-sm text-[#C0C0C0] mb-4">Permanently increase movement speed by 20%</p>
+                  <div className="flex items-center justify-between">
+                    <div className="text-yellow-400 font-semibold">50 XP</div>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (totalXP >= 50 && !ownedGifts.has("speed")) {
+                          setTotalXP(prev => prev - 50);
+                          setOwnedGifts(prev => new Set([...prev, "speed"]));
+                          setCharacter(prev => ({
+                            ...prev,
+                            abilities: {
+                              ...prev.abilities,
+                              speed: prev.abilities.speed * 1.2,
+                            },
+                          }));
+                          playSFX("discover");
+                        }
+                      }}
+                      disabled={totalXP < 50 || ownedGifts.has("speed")}
+                      className={`px-4 py-2 rounded text-sm font-semibold transition ${
+                        totalXP >= 50 && !ownedGifts.has("speed")
+                          ? "bg-yellow-400 text-black hover:bg-yellow-300"
+                          : "bg-[#666] text-[#999] cursor-not-allowed"
+                      }`}
+                    >
+                      {ownedGifts.has("speed") ? "Purchased" : "Buy"}
+                    </motion.button>
+                  </div>
+                </CornerFrame>
+
+                {/* Energy Efficiency Gift */}
+                <CornerFrame paddingClassName="p-4" className="border-2">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="text-3xl">🔋</div>
+                    <div className={`text-xs px-2 py-1 rounded ${ownedGifts.has("energy") ? "bg-green-500/20 text-green-400" : "bg-[#C0C0C0]/20 text-[#C0C0C0]"}`}>
+                      {ownedGifts.has("energy") ? "Owned" : "Available"}
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">Energy Saver</h3>
+                  <p className="text-sm text-[#C0C0C0] mb-4">Reduce energy cost by 25%</p>
+                  <div className="flex items-center justify-between">
+                    <div className="text-yellow-400 font-semibold">75 XP</div>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (totalXP >= 75 && !ownedGifts.has("energy")) {
+                          setTotalXP(prev => prev - 75);
+                          setOwnedGifts(prev => new Set([...prev, "energy"]));
+                          setCharacter(prev => ({
+                            ...prev,
+                            abilities: {
+                              ...prev.abilities,
+                              energyEfficiency: prev.abilities.energyEfficiency * 1.25,
+                            },
+                          }));
+                          playSFX("discover");
+                        }
+                      }}
+                      disabled={totalXP < 75 || ownedGifts.has("energy")}
+                      className={`px-4 py-2 rounded text-sm font-semibold transition ${
+                        totalXP >= 75 && !ownedGifts.has("energy")
+                          ? "bg-yellow-400 text-black hover:bg-yellow-300"
+                          : "bg-[#666] text-[#999] cursor-not-allowed"
+                      }`}
+                    >
+                      {ownedGifts.has("energy") ? "Purchased" : "Buy"}
+                    </motion.button>
+                  </div>
+                </CornerFrame>
+
+                {/* Artifact Sense Gift */}
+                <CornerFrame paddingClassName="p-4" className="border-2">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="text-3xl">🔍</div>
+                    <div className={`text-xs px-2 py-1 rounded ${ownedGifts.has("sense") ? "bg-green-500/20 text-green-400" : "bg-[#C0C0C0]/20 text-[#C0C0C0]"}`}>
+                      {ownedGifts.has("sense") ? "Owned" : "Available"}
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">Artifact Scanner</h3>
+                  <p className="text-sm text-[#C0C0C0] mb-4">Increase artifact detection range by 50%</p>
+                  <div className="flex items-center justify-between">
+                    <div className="text-yellow-400 font-semibold">60 XP</div>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (totalXP >= 60 && !ownedGifts.has("sense")) {
+                          setTotalXP(prev => prev - 60);
+                          setOwnedGifts(prev => new Set([...prev, "sense"]));
+                          setCharacter(prev => ({
+                            ...prev,
+                            abilities: {
+                              ...prev.abilities,
+                              artifactSense: prev.abilities.artifactSense * 1.5,
+                            },
+                          }));
+                          playSFX("discover");
+                        }
+                      }}
+                      disabled={totalXP < 60 || ownedGifts.has("sense")}
+                      className={`px-4 py-2 rounded text-sm font-semibold transition ${
+                        totalXP >= 60 && !ownedGifts.has("sense")
+                          ? "bg-yellow-400 text-black hover:bg-yellow-300"
+                          : "bg-[#666] text-[#999] cursor-not-allowed"
+                      }`}
+                    >
+                      {ownedGifts.has("sense") ? "Purchased" : "Buy"}
+                    </motion.button>
+                  </div>
+                </CornerFrame>
+
+                {/* Character Appearance Gift */}
+                <CornerFrame paddingClassName="p-4" className="border-2">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="text-3xl">✨</div>
+                    <div className={`text-xs px-2 py-1 rounded ${ownedGifts.has("glow") ? "bg-green-500/20 text-green-400" : "bg-[#C0C0C0]/20 text-[#C0C0C0]"}`}>
+                      {ownedGifts.has("glow") ? "Owned" : "Available"}
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">Enhanced Glow</h3>
+                  <p className="text-sm text-[#C0C0C0] mb-4">Increase character glow and visual effects by 50%</p>
+                  <div className="flex items-center justify-between">
+                    <div className="text-yellow-400 font-semibold">40 XP</div>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (totalXP >= 40 && !ownedGifts.has("glow")) {
+                          setTotalXP(prev => prev - 40);
+                          setOwnedGifts(prev => new Set([...prev, "glow"]));
+                          setCharacter(prev => ({
+                            ...prev,
+                            appearance: {
+                              ...prev.appearance,
+                              glow: prev.appearance.glow * 1.5,
+                            },
+                          }));
+                          playSFX("discover");
+                        }
+                      }}
+                      disabled={totalXP < 40 || ownedGifts.has("glow")}
+                      className={`px-4 py-2 rounded text-sm font-semibold transition ${
+                        totalXP >= 40 && !ownedGifts.has("glow")
+                          ? "bg-yellow-400 text-black hover:bg-yellow-300"
+                          : "bg-[#666] text-[#999] cursor-not-allowed"
+                      }`}
+                    >
+                      {ownedGifts.has("glow") ? "Purchased" : "Buy"}
+                    </motion.button>
+                  </div>
+                </CornerFrame>
+
+                {/* Energy Refill Gift */}
+                <CornerFrame paddingClassName="p-4" className="border-2">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="text-3xl">⚡</div>
+                    <div className="text-xs px-2 py-1 rounded bg-[#C0C0C0]/20 text-[#C0C0C0]">
+                      Consumable
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">Energy Potion</h3>
+                  <p className="text-sm text-[#C0C0C0] mb-4">Instantly restore 50 energy</p>
+                  <div className="flex items-center justify-between">
+                    <div className="text-yellow-400 font-semibold">30 XP</div>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (totalXP >= 30) {
+                          setTotalXP(prev => prev - 30);
+                          setEnergy(e => Math.min(100, e + 50));
+                          playSFX("energy");
+                        }
+                      }}
+                      disabled={totalXP < 30 || energy >= 100}
+                      className={`px-4 py-2 rounded text-sm font-semibold transition ${
+                        totalXP >= 30 && energy < 100
+                          ? "bg-yellow-400 text-black hover:bg-yellow-300"
+                          : "bg-[#666] text-[#999] cursor-not-allowed"
+                      }`}
+                    >
+                      {energy >= 100 ? "Full" : "Buy"}
+                    </motion.button>
+                  </div>
+                </CornerFrame>
+
+                {/* XP Multiplier Gift */}
+                <CornerFrame paddingClassName="p-4" className="border-2">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="text-3xl">⭐</div>
+                    <div className={`text-xs px-2 py-1 rounded ${ownedGifts.has("xpmult") ? "bg-green-500/20 text-green-400" : "bg-[#C0C0C0]/20 text-[#C0C0C0]"}`}>
+                      {ownedGifts.has("xpmult") ? "Owned" : "Available"}
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">XP Boost</h3>
+                  <p className="text-sm text-[#C0C0C0] mb-4">Earn 25% more XP from artifacts</p>
+                  <div className="flex items-center justify-between">
+                    <div className="text-yellow-400 font-semibold">100 XP</div>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (totalXP >= 100 && !ownedGifts.has("xpmult")) {
+                          setTotalXP(prev => prev - 100);
+                          setOwnedGifts(prev => new Set([...prev, "xpmult"]));
+                          playSFX("discover");
+                        }
+                      }}
+                      disabled={totalXP < 100 || ownedGifts.has("xpmult")}
+                      className={`px-4 py-2 rounded text-sm font-semibold transition ${
+                        totalXP >= 100 && !ownedGifts.has("xpmult")
+                          ? "bg-yellow-400 text-black hover:bg-yellow-300"
+                          : "bg-[#666] text-[#999] cursor-not-allowed"
+                      }`}
+                    >
+                      {ownedGifts.has("xpmult") ? "Purchased" : "Buy"}
+                    </motion.button>
+                  </div>
+                </CornerFrame>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-[#C0C0C0]/30">
+                <button
+                  onClick={() => setShopOpen(false)}
+                  className="w-full rounded border border-white px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+                >
+                  Close Shop
+                </button>
+              </div>
             </CornerFrame>
           </div>
         )}
