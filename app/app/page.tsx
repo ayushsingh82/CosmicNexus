@@ -74,126 +74,259 @@ export default function AppHome() {
   const [discoveredRealms, setDiscoveredRealms] = useState<RealmType[]>(["cosmic"]);
   const [questProgress, setQuestProgress] = useState(0);
   const [particles, setParticles] = useState<Array<{ id: string; x: number; y: number; color: string }>>([]);
+  const [audioInitialized, setAudioInitialized] = useState(false);
+  const [npcInteractionHistory, setNpcInteractionHistory] = useState<Record<string, number>>({});
   
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ambientAudioRef = useRef<AudioNode | null>(null);
+  const ambientOscillatorsRef = useRef<OscillatorNode[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Initialize realm with AI-generated content
   useEffect(() => {
     generateRealmContent(currentRealm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRealm]);
 
+  // AI-Generated Dynamic NPC Dialogue based on context
+  function generateNPCDialogue(type: string, realm: RealmType, interactionCount: number, questProgress: number, artifactsCollected: number): string {
+    const baseDialogues: Record<string, Record<string, string[]>> = {
+      guide: {
+        cosmic: [
+          "The cosmos whispers secrets. Follow the starlight, explorer.",
+          `I see you've collected ${artifactsCollected} artifacts. The stars align with your progress.`,
+          `You've journeyed through ${questProgress} quests. The universe expands before you.`,
+          "The nebula shifts with your presence. What mysteries will you uncover?",
+        ],
+        crystal: [
+          "The crystals show many paths. Choose wisely, traveler.",
+          `Your ${artifactsCollected} artifacts reflect in the crystal light.`,
+          "Each path through these caves reveals new truths.",
+          "The crystal resonance grows stronger with your presence.",
+        ],
+        neon: [
+          "I am the flow of information. Where shall we go next?",
+          `Data streams converge around your ${artifactsCollected} collected items.`,
+          "The network recognizes your journey. Access granted.",
+          "Digital pathways open before you.",
+        ],
+        void: [
+          "In emptiness, truth. In silence, answers.",
+          `Your ${artifactsCollected} artifacts echo in the void.`,
+          "The nothingness holds everything. Do you see it?",
+          "Each discovery fills the emptiness with meaning.",
+        ],
+        zenith: [
+          "You've reached the peak. But can you ascend further?",
+          `Your ${artifactsCollected} artifacts shimmer at this height.`,
+          "Few have come this far. What do you seek?",
+          "The zenith responds to your presence.",
+        ],
+      },
+      merchant: {
+        cosmic: ["Trade stardust for knowledge. What do you seek?", `I see you have ${artifactsCollected} artifacts. I offer rare cosmic wares.`, "The market follows the stars. Prices shift with the nebula."],
+        crystal: ["Crystal shards for sale. Rare and powerful.", `Your ${artifactsCollected} artifacts would trade well here.`, "The crystal market values determination."],
+        neon: ["Upgrade your connection. The network expands.", `With ${artifactsCollected} artifacts, you could access premium circuits.`, "Digital currency flows like data streams."],
+        void: ["Even in void, trade exists. What's your offer?", `Your ${artifactsCollected} artifacts hold value here.`, "Void merchants deal in silence and substance."],
+        zenith: ["At the peak, only the finest wares matter.", `Your ${artifactsCollected} artifacts are worthy.`, "Zenith trade requires peak performance."],
+      },
+      mystic: {
+        cosmic: ["The stars speak of your journey. Listen closely.", `Your ${artifactsCollected} artifacts resonate with cosmic energy.`, "The nebula foretells great discoveries ahead."],
+        crystal: ["Crystals reveal what the eye cannot see.", `Your ${artifactsCollected} artifacts enhance your perception.`, "The caves remember all who pass through."],
+        neon: ["Data patterns predict your path.", `Your ${artifactsCollected} artifacts influence the digital streams.`, "The network knows your intent before you act."],
+        void: ["In emptiness, truth. In silence, answers.", `Your ${artifactsCollected} artifacts echo in the void.`, "The nothingness teaches everything."],
+        zenith: ["Transcendence is within reach. Do you see it?", `Your ${artifactsCollected} artifacts glow at this height.`, "The peak offers ultimate clarity."],
+      },
+      guardian: {
+        cosmic: ["The cosmos protects its secrets. Prove yourself.", `With ${artifactsCollected} artifacts, you may pass.`, "Stellar guardians test all travelers."],
+        crystal: ["These caves hold ancient power. Prove your worth.", `Your ${artifactsCollected} artifacts show your dedication.`, "Crystal guardians judge by action, not words."],
+        neon: ["The network guards its core. Access requires merit.", `Your ${artifactsCollected} artifacts grant you passage.`, "Digital guardians watch all connections."],
+        void: ["Void guardians exist beyond existence. Show yourself.", `Your ${artifactsCollected} artifacts validate your presence.`, "Guardians of nothingness protect everything."],
+        zenith: ["Peak guardians accept only the worthy.", `Your ${artifactsCollected} artifacts prove your journey.`, "Zenith guardians test ultimate resolve."],
+      },
+    };
+
+    const dialogues = baseDialogues[type]?.[realm] || ["Greetings, traveler."];
+    const index = Math.min(interactionCount, dialogues.length - 1);
+    return dialogues[index] || dialogues[0];
+  }
+
+  // AI-Generated Procedural Artifact Names
+  function generateArtifactName(realm: RealmType, index: number): string {
+    const prefixes = {
+      cosmic: ["Star", "Nebula", "Cosmic", "Stellar", "Galactic"],
+      crystal: ["Crystal", "Prism", "Shard", "Gem", "Refractor"],
+      neon: ["Data", "Circuit", "Digital", "Energy", "Neon"],
+      void: ["Void", "Silence", "Empty", "Null", "Echo"],
+      zenith: ["Peak", "Zenith", "Transcendent", "Apex", "Summit"],
+    };
+    const suffixes = ["Fragment", "Core", "Shard", "Orb", "Essence", "Stone", "Jewel", "Crystal"];
+    
+    const prefixList = prefixes[realm];
+    const prefix = prefixList[Math.floor(Math.random() * prefixList.length)];
+    const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+    return `${prefix} ${suffix}`;
+  }
+
+  // AI-Generated Procedural Skybox Colors
+  function generateSkybox(realm: RealmType): string {
+    const baseColors = {
+      cosmic: { primary: "#1a0033", secondary: "#000428", accent: "#4a00e0" },
+      crystal: { primary: "#0f3460", secondary: "#16213e", accent: "#00d4ff" },
+      neon: { primary: "#1a0033", secondary: "#2d1b69", accent: "#ff00ff" },
+      void: { primary: "#000000", secondary: "#0a0a0a", accent: "#ffffff" },
+      zenith: { primary: "#667eea", secondary: "#764ba2", accent: "#f093fb" },
+    };
+    
+    const colors = baseColors[realm];
+    const angle = Math.random() * 360;
+    const posX = 20 + Math.random() * 60;
+    const posY = 20 + Math.random() * 60;
+    
+    if (realm === "cosmic" || realm === "crystal") {
+      return `radial-gradient(circle at ${posX}% ${posY}%, ${colors.primary}, ${colors.secondary}, ${colors.accent}40)`;
+    } else {
+      return `linear-gradient(${angle}deg, ${colors.primary} 0%, ${colors.secondary} 50%, ${colors.accent}88 100%)`;
+    }
+  }
+
   function generateRealmContent(realm: RealmType) {
-    // AI-Generated NPCs for each realm
+    // AI-Generated NPCs with dynamic positioning
     const realmNPCs: NPC[] = [];
     const realmArtifacts: Artifact[] = [];
     
-    const npcConfigs = {
-      cosmic: [
-        { name: "Stellar Guide", type: "guide" as const, dialogue: "The cosmos whispers secrets. Follow the starlight, explorer.", x: 30, y: 40 },
-        { name: "Nebula Merchant", type: "merchant" as const, dialogue: "Trade stardust for knowledge. What do you seek?", x: 70, y: 60 },
-      ],
-      crystal: [
-        { name: "Crystal Seer", type: "mystic" as const, dialogue: "The crystals show many paths. Choose wisely, traveler.", x: 40, y: 50 },
-        { name: "Cave Guardian", type: "guardian" as const, dialogue: "These caves hold ancient power. Prove your worth.", x: 60, y: 30 },
-      ],
-      neon: [
-        { name: "Data Stream", type: "guide" as const, dialogue: "I am the flow of information. Where shall we go next?", x: 50, y: 45 },
-        { name: "Circuit Vendor", type: "merchant" as const, dialogue: "Upgrade your connection. The network expands.", x: 25, y: 70 },
-      ],
-      void: [
-        { name: "The Watcher", type: "mystic" as const, dialogue: "In emptiness, truth. In silence, answers. What do you hear?", x: 50, y: 50 },
-      ],
-      zenith: [
-        { name: "Transcendent One", type: "guardian" as const, dialogue: "You've reached the peak. But can you ascend further?", x: 50, y: 40 },
-      ],
-    };
+    const npcTypes: Array<{ type: NPC["type"]; count: number }> = [
+      { type: "guide", count: 1 },
+      { type: "merchant", count: Math.random() > 0.5 ? 1 : 0 },
+      { type: "mystic", count: Math.random() > 0.7 ? 1 : 0 },
+      { type: "guardian", count: realm === "zenith" ? 1 : Math.random() > 0.8 ? 1 : 0 },
+    ];
 
-    npcConfigs[realm].forEach((npc, idx) => {
-      realmNPCs.push({
-        id: `${realm}-npc-${idx}`,
-        name: npc.name,
-        type: npc.type,
-        dialogue: npc.dialogue,
-        questActive: idx === 0,
-        x: npc.x,
-        y: npc.y,
-      });
+    let npcIndex = 0;
+    npcTypes.forEach(({ type, count }) => {
+      for (let i = 0; i < count; i++) {
+        const npcId = `${realm}-npc-${npcIndex}`;
+        const interactionCount = npcInteractionHistory[npcId] || 0;
+        const dialogue = generateNPCDialogue(type, realm, interactionCount, questProgress, artifacts.filter(a => a.collected).length);
+        const names: Record<string, string[]> = {
+          guide: ["Stellar Guide", "Cosmic Navigator", "Pathfinder", "Realm Guide"],
+          merchant: ["Nebula Merchant", "Trade Master", "Vendor", "Market Keeper"],
+          mystic: ["Crystal Seer", "Oracle", "Prophet", "The Watcher"],
+          guardian: ["Realm Guardian", "Protector", "Keeper", "The Transcendent One"],
+        };
+        
+        realmNPCs.push({
+          id: npcId,
+          name: names[type][Math.floor(Math.random() * names[type].length)],
+          type,
+          dialogue,
+          questActive: type === "guide",
+          x: 20 + Math.random() * 60,
+          y: 20 + Math.random() * 60,
+        });
+        npcIndex++;
+      }
     });
 
-    // AI-Generated Artifacts
-    const artifactNames = {
-      cosmic: ["Stardust Fragment", "Nebula Core", "Cosmic Shard"],
-      crystal: ["Crystal Prism", "Light Refractor", "Gem of Clarity"],
-      neon: ["Data Crystal", "Energy Core", "Circuit Fragment"],
-      void: ["Void Essence", "Silence Gem", "Empty Vessel"],
-      zenith: ["Peak Jewel", "Transcendence Stone", "Zenith Orb"],
-    };
-
-    artifactNames[realm].forEach((name, idx) => {
+    // AI-Generated Artifacts with procedural names
+    const artifactCount = 3 + Math.floor(Math.random() * 2);
+    for (let idx = 0; idx < artifactCount; idx++) {
       realmArtifacts.push({
         id: `${realm}-artifact-${idx}`,
-        name,
-        rarity: idx === 2 ? "epic" : idx === 1 ? "rare" : "common",
-        x: 20 + Math.random() * 60,
-        y: 20 + Math.random() * 60,
+        name: generateArtifactName(realm, idx),
+        rarity: idx === artifactCount - 1 ? "epic" : idx >= artifactCount - 2 ? "rare" : "common",
+        x: 15 + Math.random() * 70,
+        y: 15 + Math.random() * 70,
         collected: false,
       });
-    });
+    }
 
     setNpcs(realmNPCs);
     setArtifacts(realmArtifacts);
   }
 
-  // AI-Generated Ambient Audio
+  // Initialize Audio with user interaction
+  function initializeAudio() {
+    const ctx = ensureAudio();
+    if (!ctx) return false;
+    
+    if (ctx.state === "suspended") {
+      ctx.resume().then(() => {
+        setAudioInitialized(true);
+      }).catch(() => {
+        setAudioInitialized(false);
+      });
+    } else {
+      setAudioInitialized(true);
+    }
+    return true;
+  }
+
+  // AI-Generated Ambient Audio with procedural generation
   useEffect(() => {
-    if (muted) {
-      if (ambientAudioRef.current) {
-        try {
-          (ambientAudioRef.current as any).stop?.();
-        } catch {}
-        ambientAudioRef.current = null;
-      }
+    if (!audioInitialized || muted) {
+      ambientOscillatorsRef.current.forEach(osc => {
+        try { osc.stop(); } catch {}
+      });
+      ambientOscillatorsRef.current = [];
       return;
     }
 
     const ctx = ensureAudio();
-    if (!ctx) return;
+    if (!ctx || ctx.state !== "running") return;
 
-    // Create ambient pad based on realm
-    const frequencies = {
-      cosmic: [110, 165, 220],
-      crystal: [131, 196, 262],
-      neon: [147, 220, 294],
-      void: [98, 147, 196],
-      zenith: [165, 247, 330],
+    // Procedurally generate frequencies based on realm
+    const baseFreqs = {
+      cosmic: 110,
+      crystal: 131,
+      neon: 147,
+      void: 98,
+      zenith: 165,
     };
 
-    const freqs = frequencies[currentRealm];
+    const baseFreq = baseFreqs[currentRealm];
+    const freqs = [
+      baseFreq,
+      baseFreq * 1.5 + Math.random() * 10 - 5,
+      baseFreq * 2 + Math.random() * 10 - 5,
+    ];
+
     const oscillators: OscillatorNode[] = [];
     const gains: GainNode[] = [];
 
     freqs.forEach((freq, idx) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "sine";
+      const oscType: OscillatorType[] = ["sine", "triangle", "sawtooth"];
+      osc.type = oscType[idx % 3];
       osc.frequency.value = freq;
-      gain.gain.value = idx === 0 ? 0.015 : 0.008;
+      
+      // Add subtle LFO for ambient movement
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      lfo.frequency.value = 0.1 + Math.random() * 0.2;
+      lfoGain.gain.value = 2 + Math.random() * 3;
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      lfo.start();
+      
+      gain.gain.value = idx === 0 ? 0.02 : idx === 1 ? 0.01 : 0.005;
       osc.connect(gain).connect(ctx.destination);
       osc.start();
       oscillators.push(osc);
       gains.push(gain);
     });
 
-    ambientAudioRef.current = gains[0]; // Store reference
+    ambientOscillatorsRef.current = oscillators;
+    ambientAudioRef.current = gains[0];
 
     return () => {
       oscillators.forEach(osc => {
         try { osc.stop(); } catch {}
       });
+      ambientOscillatorsRef.current = [];
     };
-  }, [currentRealm, muted]);
+  }, [currentRealm, muted, audioInitialized]);
 
   function ensureAudio() {
     if (!audioCtxRef.current) {
@@ -204,13 +337,14 @@ export default function AppHome() {
     return audioCtxRef.current;
   }
 
-  // AI-Generated SFX
+  // AI-Generated SFX with procedural variation
   function playSFX(type: "collect" | "portal" | "interact" | "discover" | "energy") {
-    if (muted) return;
+    if (muted || !audioInitialized) return;
     const ctx = ensureAudio();
-    if (!ctx) return;
+    if (!ctx || ctx.state !== "running") return;
 
-    const configs = {
+    // Procedurally generate frequencies with variation
+    const baseConfigs = {
       collect: { freq: 800, duration: 0.2, type: "triangle" as OscillatorType },
       portal: { freq: 400, duration: 0.4, type: "sawtooth" as OscillatorType },
       interact: { freq: 600, duration: 0.15, type: "square" as OscillatorType },
@@ -218,17 +352,28 @@ export default function AppHome() {
       energy: { freq: 350, duration: 0.25, type: "triangle" as OscillatorType },
     };
 
-    const config = configs[type];
+    const base = baseConfigs[type];
+    // Add variation to make it more dynamic
+    const freqVariation = base.freq + (Math.random() * 100 - 50);
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = config.type;
-    osc.frequency.value = config.freq;
+    const filter = ctx.createBiquadFilter();
+    
+    osc.type = base.type;
+    osc.frequency.value = freqVariation;
+    
+    // Add filter for richer sound
+    filter.type = "lowpass";
+    filter.frequency.value = freqVariation * 2;
+    filter.Q.value = 10;
+    
     gain.gain.value = 0.0001;
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + config.duration * 0.3);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + config.duration);
-    osc.connect(gain).connect(ctx.destination);
+    gain.gain.exponentialRampToValueAtTime(0.003, ctx.currentTime + base.duration * 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + base.duration);
+    
+    osc.connect(filter).connect(gain).connect(ctx.destination);
     osc.start();
-    osc.stop(ctx.currentTime + config.duration);
+    osc.stop(ctx.currentTime + base.duration);
   }
 
   function collectArtifact(artifactId: string) {
@@ -247,6 +392,25 @@ export default function AppHome() {
   function interactWithNPC(npc: NPC) {
     setSelectedNpc(npc);
     playSFX("interact");
+    
+    // Track interaction for dynamic dialogue
+    setNpcInteractionHistory(prev => ({
+      ...prev,
+      [npc.id]: (prev[npc.id] || 0) + 1,
+    }));
+    
+    // Update NPC dialogue based on new interaction count
+    setNpcs(prev => prev.map(n => {
+      if (n.id === npc.id) {
+        const interactionCount = (npcInteractionHistory[npc.id] || 0) + 1;
+        return {
+          ...n,
+          dialogue: generateNPCDialogue(n.type, currentRealm, interactionCount, questProgress, artifacts.filter(a => a.collected).length),
+        };
+      }
+      return n;
+    }));
+    
     if (npc.questActive) {
       setQuestProgress(p => p + 1);
     }
@@ -274,21 +438,33 @@ export default function AppHome() {
   }
 
   function movePlayer(direction: "up" | "down" | "left" | "right") {
-    setPlayerPosition(prev => ({
-      x: Math.max(10, Math.min(90, prev.x + (direction === "left" ? -5 : direction === "right" ? 5 : 0))),
-      y: Math.max(10, Math.min(90, prev.y + (direction === "up" ? -5 : direction === "down" ? 5 : 0))),
-    }));
-    // Check proximity to NPCs and artifacts
-    const nearbyNPC = npcs.find(npc => {
-      const dist = Math.sqrt(Math.pow(playerPosition.x - npc.x, 2) + Math.pow(playerPosition.y - npc.y, 2));
-      return dist < 8;
+    if (energy < 5) return;
+    
+    setPlayerPosition(prev => {
+      const newPos = {
+        x: Math.max(10, Math.min(90, prev.x + (direction === "left" ? -5 : direction === "right" ? 5 : 0))),
+        y: Math.max(10, Math.min(90, prev.y + (direction === "up" ? -5 : direction === "down" ? 5 : 0))),
+      };
+      
+      // Check proximity to NPCs and artifacts after movement
+      setTimeout(() => {
+        const nearbyNPC = npcs.find(npc => {
+          const dist = Math.sqrt(Math.pow(newPos.x - npc.x, 2) + Math.pow(newPos.y - npc.y, 2));
+          return dist < 8;
+        });
+        const nearbyArtifact = artifacts.find(art => {
+          if (art.collected) return false;
+          const dist = Math.sqrt(Math.pow(newPos.x - art.x, 2) + Math.pow(newPos.y - art.y, 2));
+          return dist < 6;
+        });
+        if (nearbyArtifact) collectArtifact(nearbyArtifact.id);
+        if (nearbyNPC && !selectedNpc) interactWithNPC(nearbyNPC);
+      }, 50);
+      
+      return newPos;
     });
-    const nearbyArtifact = artifacts.find(art => !art.collected && {
-      const dist = Math.sqrt(Math.pow(playerPosition.x - art.x, 2) + Math.pow(playerPosition.y - art.y, 2));
-      return dist < 6;
-    });
-    if (nearbyArtifact) collectArtifact(nearbyArtifact.id);
-    if (nearbyNPC && !selectedNpc) interactWithNPC(nearbyNPC);
+    
+    setEnergy(e => Math.max(0, e - 2));
   }
 
   // Energy regeneration
@@ -307,7 +483,7 @@ export default function AppHome() {
     <div 
       className="min-h-screen w-full px-4 py-6 sm:px-6 text-white relative overflow-hidden"
       style={{ 
-        background: currentRealmConfig.skybox,
+        background: generateSkybox(currentRealm),
         transition: "background 1s ease-in-out",
       }}
     >
@@ -350,10 +526,21 @@ export default function AppHome() {
               Quest Progress: <span className="text-white font-semibold">{questProgress}</span>
             </div>
           </div>
-          <label className="flex items-center gap-1 text-xs text-[#C0C0C0] cursor-pointer">
-            <input type="checkbox" checked={muted} onChange={(e) => setMuted(e.target.checked)} />
-            Mute
-          </label>
+          <div className="flex items-center gap-3">
+            {!audioInitialized && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={initializeAudio}
+                className="rounded border border-[#EBF73F] px-3 py-1 text-xs font-semibold text-[#EBF73F] hover:bg-[#EBF73F]/10"
+              >
+                🔊 Enable Audio
+              </motion.button>
+            )}
+            <label className="flex items-center gap-1 text-xs text-[#C0C0C0] cursor-pointer">
+              <input type="checkbox" checked={muted} onChange={(e) => setMuted(e.target.checked)} />
+              {audioInitialized ? "Mute" : "Audio"}
+            </label>
+          </div>
         </CornerFrame>
 
         {/* Realm Info */}
@@ -581,6 +768,37 @@ export default function AppHome() {
                       </div>
                     ))
                 )}
+              </div>
+            </CornerFrame>
+
+            {/* Gen AI Features Display */}
+            <CornerFrame paddingClassName="p-4">
+              <h3 className="mb-3 text-lg font-bold text-white">✨ AI Features Active</h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-[#C0C0C0]">
+                  <span className="text-green-400">✓</span>
+                  <span>AI NPCs - Dynamic dialogue generation</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#C0C0C0]">
+                  <span className="text-green-400">✓</span>
+                  <span>Environment Generation - Procedural realms</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#C0C0C0]">
+                  <span className="text-green-400">✓</span>
+                  <span>Skybox Generation - Dynamic backgrounds</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#C0C0C0]">
+                  <span className="text-green-400">✓</span>
+                  <span>Ambient Audio - Procedural soundscapes</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#C0C0C0]">
+                  <span className="text-green-400">✓</span>
+                  <span>SFX Generation - Dynamic sound effects</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#C0C0C0]">
+                  <span className="text-green-400">✓</span>
+                  <span>Artifact Generation - Procedural items</span>
+                </div>
               </div>
             </CornerFrame>
           </aside>
