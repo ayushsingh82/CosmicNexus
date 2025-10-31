@@ -29,7 +29,7 @@ export default function LandingPage() {
 
       <div className="text-center space-y-8 max-w-3xl px-8">
         <TrueFocus
-          sentence="Block Party Tycoon"
+          sentence="Cosmic Nexus"
           manualMode={false}
           blurAmount={5}
           borderColor="#C0C0C0"
@@ -39,7 +39,7 @@ export default function LandingPage() {
           pauseBetweenAnimations={1}
         />
         <p className="text-xl text-[#C0C0C0] leading-relaxed">
-          A fast, social tycoon experience built for mobile: open your shop, serve customers, upgrade, and ride the rush hour.
+          An immersive AI-powered exploration experience. Journey through procedurally generated realms, interact with intelligent NPCs, discover artifacts, and experience AI-generated environments, soundscapes, and narratives.
         </p>
         <Link
           href="/app"
